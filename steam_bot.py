@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 import re
 
 # 🔴 مقادیر خودت رو اینجا بذار
-TELEGRAM_TOKEN = "68415450040:AAEplCwSigVpx2YOejWk2OZLAZf_Bwu4LgU"
+TELEGRAM_TOKEN = "8415450040:AAEk23aNy-o6tNGPSDq-T6Ka7IxH1w7yW4A"
 TELEGRAM_CHAT_ID = "823135316"
 
 def send_telegram(message):

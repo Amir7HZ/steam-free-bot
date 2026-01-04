@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ربات بازی‌های با تخفیف ۱۰۰٪ استیم (Free to Keep NOW)
+ربات بازی‌های ۱۰۰٪ تخفیف استیم - نسخه اصلاح شده با API واقعی
 """
 
 import requests
-import json
 from datetime import datetime
 
 # 🔴 اطلاعات شما
@@ -27,222 +26,189 @@ def send_telegram(message):
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
-def get_100_percent_discount_games():
-    """دریافت بازی‌های با ۱۰۰٪ تخفیف از API استیم"""
-    print("🔍 جستجوی بازی‌های با ۱۰۰٪ تخفیف در استیم...")
-    
-    try:
-        # API استیم برای بازی‌های با تخفیف
-        url = "https://store.steampowered.com/api/featuredcategories"
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://store.steampowered.com/'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=20)
-        
-        if response.status_code != 200:
-            print(f"❌ خطای API استیم: {response.status_code}")
-            return []
-        
-        data = response.json()
-        games = []
-        
-        # بررسی بخش "specials" (تخفیف‌ها)
-        if 'specials' in data:
-            specials = data['specials']['items']
-            
-            for game in specials:
-                discount = game.get('discount_percent', 0)
-                final_price = game.get('final_price', 999)
-                original_price = game.get('original_price', 1000)
-                
-                # فقط بازی‌هایی با ۱۰۰٪ تخفیف و قیمت نهایی ۰
-                if discount == 100 and final_price == 0:
-                    games.append({
-                        'name': game.get('name', 'Unknown'),
-                        'app_id': game.get('id'),
-                        'discount': discount,
-                        'original_price': original_price / 100,  # تبدیل به تومان/دلار
-                        'final_price': final_price,
-                        'header_image': game.get('header_image', ''),
-                        'type': '100% OFF'
-                    })
-        
-        print(f"✅ {len(games)} بازی با ۱۰۰٪ تخفیف پیدا شد")
-        return games[:10]  # حداکثر ۱۰ بازی
-        
-    except Exception as e:
-        print(f"⚠️ خطا در دریافت از استیم: {e}")
-        return []
+def get_real_100_off_games():
+    """
+    دریافت واقعی بازی‌های ۱۰۰٪ تخفیف از API استیم
+    با استفاده از پارامترهای دقیق لینک شما
+    """
+    print("🔍 در حال دریافت لیست واقعی از API استیم...")
 
-def get_free_to_keep_from_search():
-    """جستجوی مستقیم بازی‌های Free to Keep"""
-    print("🔍 جستجوی Free to Keep...")
-    
     try:
-        # جستجوی بازی‌های با قیمت ۰
-        search_url = "https://store.steampowered.com/search/results/?query&start=0&count=20&dynamic_data=&sort_by=_ASC&maxprice=free&specials=1&infinite=1"
+        # پارامترهای مهم از لینک شما:
+        # maxprice=free (رایگان)
+        # specials=1 (تخفیف‌های ویژه)
+        # ndl=1 (احتمالاً برای جلوگیری از کش)
+        url = "https://store.steampowered.com/search/results/"
         
+        # پارامترهای پرس و جو (Query Parameters)
+        params = {
+            'query': '',  # رشته جستجوی خالی
+            'start': 0,   # شروع از آیتم صفرم
+            'count': 50,  # تعداد آیتم‌های درخواستی (می‌توانید افزایش دهید)
+            'dynamic_data': '',
+            'sort_by': '_ASC',
+            'maxprice': 'free',  # فیلتر اصلی: قیمت حداکثر رایگان
+            'specials': 1,       # فیلتر اصلی: فقط تخفیف‌های ویژه
+            'supportedlang': 'english',
+            'ndl': 1,
+            'snr': '1_7_7_240_7',
+            'infinite': 1
+        }
+
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'X-Requested-With': 'XMLHttpRequest',
             'Referer': 'https://store.steampowered.com/search/?maxprice=free&specials=1'
         }
-        
-        response = requests.get(search_url, headers=headers, timeout=20)
+
+        response = requests.get(url, params=params, headers=headers, timeout=25)
         
         if response.status_code != 200:
+            print(f"❌ خطا از سمت استیم! کد وضعیت: {response.status_code}")
             return []
-        
+
         data = response.json()
-        games = []
         
-        if data.get('total_count', 0) > 0:
-            # HTML بازی‌ها را پارس کن
-            from bs4 import BeautifulSoup
+        # بررسی وجود نتایج
+        if not data.get('results_html') or data.get('total_count') == 0:
+            print("⚠️ API استیم پاسخ داد، اما بازی‌ای یافت نشد.")
+            return []
+
+        total_games = data.get('total_count', 0)
+        print(f"✅ API استیم پاسخ داد. در کل {total_games} آیتم رایگان/تخفیف‌خورده یافت شد.")
+
+        # تجزیه HTML نتایج
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(data['results_html'], 'html.parser')
+        
+        games_found = []
+        game_rows = soup.find_all('a', class_='search_result_row')
+
+        for row in game_rows:
+            # استخراج نام بازی
+            title_elem = row.find('span', class_='title')
+            if not title_elem:
+                continue
+            game_name = title_elem.text.strip()
+
+            # استخراج آدرس و App ID
+            game_url = row.get('href', '')
+            data_ds_appid = row.get('data-ds-appid', '')
+            app_id = data_ds_appid.split(',')[0] if data_ds_appid else ''
+
+            # بررسی درصد تخفیف
+            discount_block = row.find('div', class_='search_discount')
+            discount_text = discount_block.text.strip() if discount_block else "0%"
             
-            soup = BeautifulSoup(data['results_html'], 'html.parser')
-            items = soup.find_all('a', {'class': 'search_result_row'})
-            
-            for item in items[:15]:  # 15 بازی اول
-                title = item.get('data-search-title', '')
-                app_id = item.get('data-ds-appid', '')
-                discount = item.find('div', {'class': 'search_discount'})
+            # استخراج عدد تخفیف (مثلاً از "-100%" عدد 100 را بگیر)
+            import re
+            discount_match = re.search(r'(\d+)%', discount_text)
+            discount_percent = int(discount_match.group(1)) if discount_match else 0
+
+            # فقط بازی‌های با ۱۰۰٪ تخفیف را نگه دار
+            if discount_percent == 100:
+                # استخراج قیمت‌ها (برای اطمینان)
+                price_block = row.find('div', class_='search_price')
+                price_text = price_block.text.strip() if price_block else ""
                 
-                if discount and '100%' in discount.text:
-                    price = item.find('div', {'class': 'search_price'})
-                    
-                    games.append({
-                        'name': title,
-                        'app_id': app_id,
-                        'discount': 100,
-                        'type': 'FREE TO KEEP'
-                    })
-        
-        return games
-        
+                games_found.append({
+                    'name': game_name,
+                    'app_id': app_id,
+                    'discount': discount_percent,
+                    'url': game_url,
+                    'price_text': price_text,
+                    'type': '💯 100% OFF'
+                })
+
+        print(f"🎮 از بین آنها، {len(games_found)} بازی با تخفیف ۱۰۰٪ شناسایی شد.")
+        return games_found
+
+    except requests.exceptions.Timeout:
+        print("⏳ زمان درخواست به استیم به پایان رسید.")
+        return []
     except Exception as e:
-        print(f"⚠️ خطا در جستجو: {e}")
+        print(f"⚠️ یک خطای غیرمنتظره رخ داد: {e}")
         return []
 
-def create_message(api_games, search_games):
-    """ساخت پیام فارسی فقط برای بازی‌های ۱۰۰٪ تخفیف"""
+def create_message(games_list):
+    """ساخت پیام فارسی"""
     now = datetime.now()
     persian_date = now.strftime('%Y/%m/%d')
     persian_time = now.strftime('%H:%M')
     
-    # ترکیب بازی‌ها
-    all_games = api_games + search_games
-    
-    # حذف تکراری‌ها
-    unique_games = []
-    seen_names = set()
-    
-    for game in all_games:
-        if game['name'] not in seen_names:
-            seen_names.add(game['name'])
-            unique_games.append(game)
-    
-    # مرتب‌سازی
-    unique_games = unique_games[:8]  # 8 بازی اول
-    
     message = f"""
-<b>💯 بازی‌های با ۱۰۰٪ تخفیف استیم</b>
-💰 <i>فقط Free to Keep - قابل اضافه کردن به کتابخانه</i>
-📅 {persian_date} - ⏰ {persian_time}
+<b>💯 فهرست بازی‌های ۱۰۰٪ تخفیف استیم</b>
+🕐 بروزرسانی: {persian_date} - {persian_time}
+🔗 <i>منبع: فیلتر مستقیم فروشگاه استیم</i>
 ────────────────────
 """
     
-    if unique_games:
-        message += f"\n<b>🎮 {len(unique_games)} بازی با تخفیف ۱۰۰٪:</b>\n\n"
-        
-        for i, game in enumerate(unique_games, 1):
-            message += f"{i}. <b>{game['name']}</b>\n"
-            
-            # لینک مستقیم به استیم
-            if game.get('app_id'):
-                steam_url = f"https://store.steampowered.com/app/{game['app_id']}/"
-                message += f"   🔗 <a href='{steam_url}'>دریافت از استیم</a>\n"
-            
-            # قیمت‌ها
-            if game.get('original_price'):
-                message += f"   📉 قبل: ${game['original_price']} → الان: <b>رایگان</b>\n"
-            else:
-                message += f"   🎁 وضعیت: <b>Free to Keep</b>\n"
-            
-            message += f"   ⚡ تخفیف: <b>۱۰۰٪</b>\n"
-            message += "   ────────────────────\n"
-        
-        message += f"""
-<b>📊 جمع‌بندی:</b>
-• 💰 قیمت همه: <b>رایگان</b>
-• ⏰ زمان فعلی: {persian_time}
-• 🎮 قابل اضافه‌کردن به کتابخانه: <b>بله</b>
-"""
+    if games_list:
+        # ممکن است بازی‌های Free-to-Play نیز در نتایج باشند، آنها را جدا کنید
+        true_100_off = [g for g in games_list if "Free" not in g.get('price_text', '')]
+        free_to_play = [g for g in games_list if "Free" in g.get('price_text', '')]
+
+        if true_100_off:
+            message += f"\n<b>🎁 بازی‌های با تخفیف ۱۰۰٪ (قیمت اصلی داشتند):</b>\n\n"
+            for i, game in enumerate(true_100_off[:10], 1):  # حداکثر ۱۰ مورد
+                steam_link = f"https://store.steampowered.com/app/{game['app_id']}/" if game['app_id'] else game['url']
+                message += f"{i}. <b>{game['name']}</b>\n"
+                message += f"   🔗 <a href='{steam_link}'>مشاهده در استیم</a>\n"
+                message += f"   ⚡ قیمت نهایی: <b>رایگان</b>\n"
+                message += "   ────────────────────\n"
+
+        # اگر فقط بازی Free-to-Play یافت شد
+        if not true_100_off and free_to_play:
+            message += f"\n<b>⚠️ امروز بازی با تخفیف ۱۰۰٪ یافت نشد، اما این بازی‌های رایگان دائم موجودند:</b>\n\n"
+            for i, game in enumerate(free_to_play[:5], 1):
+                steam_link = f"https://store.steampowered.com/app/{game['app_id']}/" if game['app_id'] else game['url']
+                message += f"{i}. <b>{game['name']}</b>\n"
+                message += f"   🔗 <a href='{steam_link}'>صفحه استیم</a>\n"
+                message += "   ────────────────────\n"
+            message += "\n<i>نکته: اینها بازی‌های Free-to-Play هستند که همیشه رایگان‌اند، نه تخفیف موقت.</i>\n"
     else:
         message += """
-<b>⚠️ امروز هیچ بازی با ۱۰۰٪ تخفیف پیدا نکردم!</b>
+<b>🔍 امروز بازی با تخفیف ۱۰۰٪ یافت نشد.</b>
 
-💡 <i>معمولاً بازی‌های ۱۰۰٪ تخفیف در این مواقع ظاهر می‌شوند:</i>
-• جشنواره‌های بزرگ استیم (Summer/Winter Sale)
-• آخر هفته‌های خاص
-• مناسبت‌های ویژه شرکت‌ها
-
-🔍 <i>خودتان بررسی کنید:</i>
-• <a href="https://store.steampowered.com/search/?maxprice=free&specials=1">لیست بازی‌های رایگان استیم</a>
-• <a href="https://steamdb.info/sales/?min_discount=100">SteamDB: 100% Discount</a>
+💡 توضیح:
+• این ربات اکنون مستقیماً از فیلترهای فروشگاه استیم استفاده می‌کند.
+• ممکن است واقعاً در لحظهٔ بررسی، بازی فعال با تخفیف ۱۰۰٪ موجود نباشد.
+• بازی‌های Free-to-Play (همیشه رایگان) در این شمارش نمی‌آیند.
 """
-    
-    # اضافه کردن منابع
+
+    # پاورقی
     message += f"""
     
-<b>🎯 منابع بررسی:</b>
-• Steam Store API
-• Steam Specials Page
-• Real-time Search
+📌 <b>نکات فنی:</b>
+• داده‌ها مستقیماً از API داخلی استیم دریافت شده.
+• فیلترها: maxprice=free & specials=1
+• زمان بررسی بعدی: ۳ ساعت دیگر
 
-<b>⏰ بررسی بعدی:</b> ۳ ساعت دیگر
-<code>فقط بازی‌های ۱۰۰٪ تخفیف (Free to Keep)</code>
-
-<i>🤖 ربات اختصاصی ۱۰۰٪ تخفیف</i>
+<code>با هر اجرا، آخرین وضعیت فروشگاه بررسی می‌شود.</code>
 """
-    
-    return message, len(unique_games)
+    return message
 
 def main():
     """تابع اصلی"""
     print("=" * 70)
-    print("💯 ربات بازی‌های ۱۰۰٪ تخفیف استیم (Free to Keep)")
+    print("🔄 ربات در حال بررسی مستقیم فروشگاه استیم...")
     print("=" * 70)
     
-    # دریافت از API استیم
-    print("🔍 دریافت از Steam API...")
-    api_games = get_100_percent_discount_games()
+    games = get_real_100_off_games()
+    message = create_message(games)
     
-    # دریافت از جستجو
-    print("🔍 جستجوی مستقیم...")
-    search_games = get_free_to_keep_from_search()
-    
-    # ساخت پیام
-    message, game_count = create_message(api_games, search_games)
-    
-    # ارسال
-    print(f"📤 ارسال {game_count} بازی ۱۰۰٪ تخفیف...")
+    print("📤 در حال ارسال گزارش به تلگرام...")
     result = send_telegram(message)
     
     if result.get('ok'):
-        print(f"✅ {game_count} بازی ۱۰۰٪ تخفیف گزارش شد!")
-        print("\n" + "=" * 70)
-        print("🎉 ربات با موفقیت اجرا شد!")
+        print("✅ گزارش با موفقیت ارسال شد!")
         print("=" * 70)
         return 0
     else:
-        print(f"❌ خطا: {result.get('description', result.get('error', 'Unknown'))}")
+        error_msg = result.get('description') or result.get('error', 'خطای نامشخص')
+        print(f"❌ خطا در ارسال به تلگرام: {error_msg}")
+        print("=" * 70)
         return 1
 
 if __name__ == "__main__":

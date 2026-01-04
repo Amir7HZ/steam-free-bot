@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-ربات واقعی بازی‌های رایگان استیم - اطلاعات از SteamDB
+ربات بازی‌های با تخفیف ۱۰۰٪ استیم (Free to Keep NOW)
 """
 
 import requests
-from datetime import datetime, timedelta
-from bs4 import BeautifulSoup
-import re
+import json
+from datetime import datetime
 
 # 🔴 اطلاعات شما
 TELEGRAM_TOKEN = "8415450040:AAEk23aNy-o6tNGPSDq-T6Ka7IxH1w7yW4A"
@@ -26,301 +25,224 @@ def send_telegram(message):
         response = requests.post(url, json=data, timeout=30)
         return response.json()
     except Exception as e:
-        print(f"خطای ارسال: {e}")
-        return {"ok": False}
+        return {"ok": False, "error": str(e)}
 
-def get_real_steamdb_games():
-    """دریافت بازی‌های واقعی از SteamDB"""
-    print("🔍 دریافت اطلاعات واقعی از SteamDB...")
-    
-    games = []
+def get_100_percent_discount_games():
+    """دریافت بازی‌های با ۱۰۰٪ تخفیف از API استیم"""
+    print("🔍 جستجوی بازی‌های با ۱۰۰٪ تخفیف در استیم...")
     
     try:
-        # SteamDB صفحه upcoming free games
-        url = "https://steamdb.info/upcoming/free/"
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Referer': 'https://steamdb.info/'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=15)
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # پیدا کردن جدول بازی‌ها
-            table = soup.find('table', {'class': 'table-products'})
-            
-            if table:
-                rows = table.find_all('tr')[1:]  # سطر اول هدر است
-                
-                for row in rows[:8]:  # 8 بازی اول
-                    cols = row.find_all('td')
-                    
-                    if len(cols) >= 4:
-                        # نام بازی
-                        name_cell = cols[1]
-                        game_name = name_cell.text.strip()
-                        
-                        # لینک بازی
-                        game_link = ""
-                        link_tag = name_cell.find('a')
-                        if link_tag and 'href' in link_tag.attrs:
-                            game_link = "https://steamdb.info" + link_tag['href']
-                        
-                        # زمان
-                        time_cell = cols[3]
-                        time_text = time_cell.text.strip()
-                        
-                        # وضعیت
-                        status_cell = cols[2]
-                        status = status_cell.text.strip()
-                        
-                        if game_name and "free" in status.lower():
-                            games.append({
-                                'name': game_name,
-                                'link': game_link,
-                                'time': time_text,
-                                'status': status
-                            })
-            
-            print(f"✅ {len(games)} بازی واقعی از SteamDB دریافت شد")
-            
-            # اگر بازی پیدا نکردیم، از صفحه free-to-play بگیریم
-            if len(games) == 0:
-                games = get_free_to_play_games()
-                
-        else:
-            print(f"❌ خطا در دسترسی به SteamDB: {response.status_code}")
-            games = get_free_to_play_games()
-            
-    except Exception as e:
-        print(f"⚠️ خطا در دریافت از SteamDB: {e}")
-        games = get_free_to_play_games()
-    
-    return games
-
-def get_free_to_play_games():
-    """دریافت بازی‌های Free-to-Play معروف به عنوان جایگزین"""
-    print("📋 دریافت بازی‌های Free-to-Play معروف...")
-    
-    popular_free_games = [
-        {
-            'name': 'Counter-Strike 2',
-            'link': 'https://store.steampowered.com/app/730',
-            'time': 'همیشه رایگان',
-            'status': 'Free to Play'
-        },
-        {
-            'name': 'Dota 2',
-            'link': 'https://store.steampowered.com/app/570',
-            'time': 'همیشه رایگان',
-            'status': 'Free to Play'
-        },
-        {
-            'name': 'Apex Legends',
-            'link': 'https://store.steampowered.com/app/1172470',
-            'time': 'همیشه رایگان',
-            'status': 'Free to Play'
-        },
-        {
-            'name': 'Warframe',
-            'link': 'https://store.steampowered.com/app/230410',
-            'time': 'همیشه رایگان',
-            'status': 'Free to Play'
-        },
-        {
-            'name': 'Destiny 2',
-            'link': 'https://store.steampowered.com/app/1085660',
-            'time': 'همیشه رایگان',
-            'status': 'Free to Play'
-        }
-    ]
-    
-    return popular_free_games
-
-def get_steam_free_games_direct():
-    """دریافت مستقیم از استیم (API)"""
-    try:
-        print("🎮 بررسی مستقیم فروشگاه استیم...")
-        
-        # API استیم برای بازی‌های رایگان
+        # API استیم برای بازی‌های با تخفیف
         url = "https://store.steampowered.com/api/featuredcategories"
         
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://store.steampowered.com/'
         }
         
-        response = requests.get(url, headers=headers, timeout=15)
+        response = requests.get(url, headers=headers, timeout=20)
         
-        if response.status_code == 200:
-            data = response.json()
+        if response.status_code != 200:
+            print(f"❌ خطای API استیم: {response.status_code}")
+            return []
+        
+        data = response.json()
+        games = []
+        
+        # بررسی بخش "specials" (تخفیف‌ها)
+        if 'specials' in data:
+            specials = data['specials']['items']
             
-            # بررسی بخش specials (تخفیف‌ها)
-            if 'specials' in data:
-                specials = data['specials']['items']
-                free_games = [game for game in specials if game.get('discount_percent', 0) == 100]
+            for game in specials:
+                discount = game.get('discount_percent', 0)
+                final_price = game.get('final_price', 999)
+                original_price = game.get('original_price', 1000)
                 
-                if free_games:
-                    print(f"🎯 {len(free_games)} بازی ۱۰۰٪ تخفیف در استیم")
-                    
-                    games_list = []
-                    for game in free_games[:5]:  # 5 بازی اول
-                        games_list.append({
-                            'name': game.get('name', 'Unknown'),
-                            'link': f"https://store.steampowered.com/app/{game.get('id', '')}",
-                            'time': 'تخفیف موقت',
-                            'status': '100% OFF'
-                        })
-                    
-                    return games_list
+                # فقط بازی‌هایی با ۱۰۰٪ تخفیف و قیمت نهایی ۰
+                if discount == 100 and final_price == 0:
+                    games.append({
+                        'name': game.get('name', 'Unknown'),
+                        'app_id': game.get('id'),
+                        'discount': discount,
+                        'original_price': original_price / 100,  # تبدیل به تومان/دلار
+                        'final_price': final_price,
+                        'header_image': game.get('header_image', ''),
+                        'type': '100% OFF'
+                    })
         
-        return []
+        print(f"✅ {len(games)} بازی با ۱۰۰٪ تخفیف پیدا شد")
+        return games[:10]  # حداکثر ۱۰ بازی
         
     except Exception as e:
-        print(f"⚠️ خطا در API استیم: {e}")
+        print(f"⚠️ خطا در دریافت از استیم: {e}")
         return []
 
-def create_message(steamdb_games, steam_games):
-    """ساخت پیام فارسی با اطلاعات واقعی"""
+def get_free_to_keep_from_search():
+    """جستجوی مستقیم بازی‌های Free to Keep"""
+    print("🔍 جستجوی Free to Keep...")
+    
+    try:
+        # جستجوی بازی‌های با قیمت ۰
+        search_url = "https://store.steampowered.com/search/results/?query&start=0&count=20&dynamic_data=&sort_by=_ASC&maxprice=free&specials=1&infinite=1"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Referer': 'https://store.steampowered.com/search/?maxprice=free&specials=1'
+        }
+        
+        response = requests.get(search_url, headers=headers, timeout=20)
+        
+        if response.status_code != 200:
+            return []
+        
+        data = response.json()
+        games = []
+        
+        if data.get('total_count', 0) > 0:
+            # HTML بازی‌ها را پارس کن
+            from bs4 import BeautifulSoup
+            
+            soup = BeautifulSoup(data['results_html'], 'html.parser')
+            items = soup.find_all('a', {'class': 'search_result_row'})
+            
+            for item in items[:15]:  # 15 بازی اول
+                title = item.get('data-search-title', '')
+                app_id = item.get('data-ds-appid', '')
+                discount = item.find('div', {'class': 'search_discount'})
+                
+                if discount and '100%' in discount.text:
+                    price = item.find('div', {'class': 'search_price'})
+                    
+                    games.append({
+                        'name': title,
+                        'app_id': app_id,
+                        'discount': 100,
+                        'type': 'FREE TO KEEP'
+                    })
+        
+        return games
+        
+    except Exception as e:
+        print(f"⚠️ خطا در جستجو: {e}")
+        return []
+
+def create_message(api_games, search_games):
+    """ساخت پیام فارسی فقط برای بازی‌های ۱۰۰٪ تخفیف"""
     now = datetime.now()
     persian_date = now.strftime('%Y/%m/%d')
     persian_time = now.strftime('%H:%M')
     
-    # ایموجی بر اساس تعداد بازی‌ها
-    total_games = len(steamdb_games) + len(steam_games)
+    # ترکیب بازی‌ها
+    all_games = api_games + search_games
     
-    if total_games >= 5:
-        header_emoji = "🎉"
-    elif total_games >= 2:
-        header_emoji = "🎮"
-    else:
-        header_emoji = "🔍"
+    # حذف تکراری‌ها
+    unique_games = []
+    seen_names = set()
+    
+    for game in all_games:
+        if game['name'] not in seen_names:
+            seen_names.add(game['name'])
+            unique_games.append(game)
+    
+    # مرتب‌سازی
+    unique_games = unique_games[:8]  # 8 بازی اول
     
     message = f"""
-<b>{header_emoji} بازی‌های رایگان استیم - اطلاعات واقعی</b>
-📅 <i>{persian_date} - {persian_time}</i>
-📊 <i>منبع: SteamDB.info + Steam Store</i>
+<b>💯 بازی‌های با ۱۰۰٪ تخفیف استیم</b>
+💰 <i>فقط Free to Keep - قابل اضافه کردن به کتابخانه</i>
+📅 {persian_date} - ⏰ {persian_time}
 ────────────────────
 """
     
-    # بازی‌های از SteamDB
-    if steamdb_games:
-        message += f"\n<b>🆓 بازی‌های رایگان آینده (SteamDB):</b>\n\n"
+    if unique_games:
+        message += f"\n<b>🎮 {len(unique_games)} بازی با تخفیف ۱۰۰٪:</b>\n\n"
         
-        for i, game in enumerate(steamdb_games[:5], 1):
-            # ایموجی بر اساس وضعیت
-            if 'free to keep' in game['status'].lower():
-                emoji = "🎁"
-            elif 'free weekend' in game['status'].lower():
-                emoji = "🎪"
-            else:
-                emoji = "🆓"
+        for i, game in enumerate(unique_games, 1):
+            message += f"{i}. <b>{game['name']}</b>\n"
             
-            message += f"{i}. {emoji} <b>{game['name']}</b>\n"
-            message += f"   📍 {game['status']}\n"
-            if game['link']:
-                # تبدیل لینک SteamDB به لینک استیم
-                steam_link = convert_steamdb_to_steam(game['link'])
-                if steam_link:
-                    message += f"   🔗 <a href='{steam_link}'>دریافت از استیم</a>\n"
-            message += f"   ⏰ {game['time']}\n"
+            # لینک مستقیم به استیم
+            if game.get('app_id'):
+                steam_url = f"https://store.steampowered.com/app/{game['app_id']}/"
+                message += f"   🔗 <a href='{steam_url}'>دریافت از استیم</a>\n"
+            
+            # قیمت‌ها
+            if game.get('original_price'):
+                message += f"   📉 قبل: ${game['original_price']} → الان: <b>رایگان</b>\n"
+            else:
+                message += f"   🎁 وضعیت: <b>Free to Keep</b>\n"
+            
+            message += f"   ⚡ تخفیف: <b>۱۰۰٪</b>\n"
             message += "   ────────────────────\n"
-    
-    # بازی‌های از استیم API
-    if steam_games:
-        message += f"\n<b>💯 بازی‌های با تخفیف ۱۰۰٪ (استیم):</b>\n\n"
         
-        for i, game in enumerate(steam_games[:3], 1):
-            message += f"{i}. 💎 <b>{game['name']}</b>\n"
-            message += f"   🔗 <a href='{game['link']}'>صفحه استیم</a>\n"
-            message += f"   ⏰ {game['time']}\n"
-            message += "   ────────────────────\n"
-    
-    # اگر هیچ بازی‌ای نبود
-    if not steamdb_games and not steam_games:
-        message += """
-<b>⚠️ امروز بازی رایگان جدیدی پیدا نکردم!</b>
-
-💡 <i>معمولاً بازی‌های رایگان در این مواقع ظاهر می‌شوند:</i>
-• آخر هفته‌ها (Free Weekends)
-• جشنواره‌های استیم (Summer Sale, Winter Sale)
-• مناسبت‌های خاص
-
-🔍 <i>خودتان بررسی کنید:</i>
-• <a href="https://steamdb.info/upcoming/free/">SteamDB: بازی‌های رایگان آینده</a>
-• <a href="https://store.steampowered.com/search/?maxprice=free&specials=1">استیم: بازی‌های رایگان</a>
-• <a href="https://www.reddit.com/r/FreeGameFindings/">Reddit: FreeGameFindings</a>
+        message += f"""
+<b>📊 جمع‌بندی:</b>
+• 💰 قیمت همه: <b>رایگان</b>
+• ⏰ زمان فعلی: {persian_time}
+• 🎮 قابل اضافه‌کردن به کتابخانه: <b>بله</b>
 """
     else:
-        message += f"""
-<b>📊 آمار امروز:</b>
-• 🆓 بازی‌های آینده: {len(steamdb_games)}
-• 💯 تخفیف ۱۰۰٪: {len(steam_games)}
-• ⏰ آخرین بروزرسانی: {persian_time}
+        message += """
+<b>⚠️ امروز هیچ بازی با ۱۰۰٪ تخفیف پیدا نکردم!</b>
+
+💡 <i>معمولاً بازی‌های ۱۰۰٪ تخفیف در این مواقع ظاهر می‌شوند:</i>
+• جشنواره‌های بزرگ استیم (Summer/Winter Sale)
+• آخر هفته‌های خاص
+• مناسبت‌های ویژه شرکت‌ها
+
+🔍 <i>خودتان بررسی کنید:</i>
+• <a href="https://store.steampowered.com/search/?maxprice=free&specials=1">لیست بازی‌های رایگان استیم</a>
+• <a href="https://steamdb.info/sales/?min_discount=100">SteamDB: 100% Discount</a>
 """
     
     # اضافه کردن منابع
     message += f"""
     
-<b>🎯 منابع اطلاعات:</b>
-1. <a href="https://steamdb.info/upcoming/free/">SteamDB Upcoming Free</a>
-2. <a href="https://store.steampowered.com/search/?maxprice=free">Steam Free Games</a>
-3. <a href="https://gg.deals/free-games/">GG.deals Free Games</a>
+<b>🎯 منابع بررسی:</b>
+• Steam Store API
+• Steam Specials Page
+• Real-time Search
 
-<b>⏰ زمان بعدی بررسی:</b> ۴ ساعت دیگر
+<b>⏰ بررسی بعدی:</b> ۳ ساعت دیگر
+<code>فقط بازی‌های ۱۰۰٪ تخفیف (Free to Keep)</code>
 
-<code>اطلاعات واقعی از منابع معتبر</code>
-
-<i>🤖 github.com/Amir7HZ/steam-free-bot</i>
+<i>🤖 ربات اختصاصی ۱۰۰٪ تخفیف</i>
 """
     
-    return message
-
-def convert_steamdb_to_steam(steamdb_link):
-    """تبدیل لینک SteamDB به لینک استیم"""
-    try:
-        # استخراج آیدی بازی از لینک SteamDB
-        match = re.search(r'/app/(\d+)/', steamdb_link)
-        if match:
-            app_id = match.group(1)
-            return f"https://store.steampowered.com/app/{app_id}/"
-    except:
-        pass
-    return None
+    return message, len(unique_games)
 
 def main():
     """تابع اصلی"""
     print("=" * 70)
-    print("🎮 ربات بازی‌های رایگان - اطلاعات REAL از SteamDB")
+    print("💯 ربات بازی‌های ۱۰۰٪ تخفیف استیم (Free to Keep)")
     print("=" * 70)
     
-    # دریافت اطلاعات از منابع مختلف
-    print("🔍 دریافت اطلاعات از منابع معتبر...")
-    steamdb_games = get_real_steamdb_games()
-    steam_games = get_steam_free_games_direct()
+    # دریافت از API استیم
+    print("🔍 دریافت از Steam API...")
+    api_games = get_100_percent_discount_games()
+    
+    # دریافت از جستجو
+    print("🔍 جستجوی مستقیم...")
+    search_games = get_free_to_keep_from_search()
     
     # ساخت پیام
-    message = create_message(steamdb_games, steam_games)
+    message, game_count = create_message(api_games, search_games)
     
-    # ارسال به تلگرام
-    print("📤 ارسال اطلاعات واقعی به تلگرام...")
+    # ارسال
+    print(f"📤 ارسال {game_count} بازی ۱۰۰٪ تخفیف...")
     result = send_telegram(message)
     
-    # بررسی نتیجه
     if result.get('ok'):
-        print(f"✅ پیام ارسال شد!")
-        print(f"📊 {len(steamdb_games) + len(steam_games)} بازی واقعی گزارش شد")
+        print(f"✅ {game_count} بازی ۱۰۰٪ تخفیف گزارش شد!")
         print("\n" + "=" * 70)
-        print("🎉 ربات با اطلاعات واقعی اجرا شد!")
+        print("🎉 ربات با موفقیت اجرا شد!")
         print("=" * 70)
         return 0
     else:
-        print(f"❌ خطا در ارسال: {result.get('description', 'Unknown error')}")
+        print(f"❌ خطا: {result.get('description', result.get('error', 'Unknown'))}")
         return 1
 
 if __name__ == "__main__":

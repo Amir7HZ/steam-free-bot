@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 
 # 🔴 تنظیمات شما
 BOT_TOKEN = "8415450040:AAEk23aNy-o6tNGPSDq-T6Ka7IxH1w7yW4A"
-CHAT_ID = "6102308199"
+CHAT_ID = "823135316"
 
 def get_steam_game_names():
     """دریافت فقط اسم بازی‌ها (بدون DLC) از لینک شما"""

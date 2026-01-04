@@ -1,0 +1,50 @@
+name: Steam Free Games Bot
+
+on:
+  # امکان اجرای دستی از صفحه Actions
+  workflow_dispatch:
+  
+  # زمان‌بندی خودکار (هر ۶ ساعت)
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  check-games:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # ۱. دانلود کدهای ریپازیتوری
+    - name: 📥 Checkout code
+      uses: actions/checkout@v3
+    
+    # ۲. نصب پایتون
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    # ۳. نصب کتابخانه‌های مورد نیاز
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests beautifulsoup4 lxml
+    
+    # ۴. نمایش اطلاعات محیط
+    - name: ℹ️ Environment info
+      run: |
+        echo "Python version: $(python --version)"
+        echo "Current dir: $(pwd)"
+        echo "Files in repo:"
+        ls -la
+    
+    # ۵. اجرای ربات اصلی
+    - name: 🚀 Run Steam Bot
+      env:
+        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.CHAT_ID }}
+      run: python bot.py
+    
+    # ۶. نمایش نتیجه
+    - name: ✅ Display result
+      if: success()
+      run: echo "🎉 Bot executed successfully! Check your Telegram."

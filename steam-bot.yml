@@ -1,28 +1,36 @@
 name: Steam Free Games Bot
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 */6 * * *'  # هر ۶ ساعت
-  workflow_dispatch:  # امکان اجرای دستی
+    # هر ۶ ساعت اجرا شود
+    - cron: '0 */6 * * *'
+    
+    # همچنین هر روز ساعت ۱۲ ظهر ایران
+    - cron: '30 8 * * *'  # ۸:۳۰ UTC = ۱۲:۰۰ ایران
 
 jobs:
-  check-and-send:
+  check-games:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout
+    - name: 📥 دریافت کدها
       uses: actions/checkout@v3
-      
-    - name: Setup Python
+    
+    - name: 🐍 نصب پایتون
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
-        
-    - name: Install dependencies
-      run: pip install requests beautifulsoup4 lxml
-      
-    - name: Run Steam Bot
-      env:
-        TELEGRAM_TOKEN: ${{ vars.TELEGRAM_TOKEN }}
-        CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
+        python-version: '3.10'
+    
+    - name: 📦 نصب کتابخانه‌ها
+      run: pip install requests
+    
+    - name: 🚀 اجرای ربات
       run: python steam_bot.py
+    
+    - name: ✅ موفقیت
+      if: success()
+      run: |
+        echo "✅ ربات با موفقیت اجرا شد!"
+        echo "⏰ اجرای بعدی: ۶ ساعت دیگر"
+        echo "🎮 بازی‌های رایگان به تلگرام ارسال شدند."

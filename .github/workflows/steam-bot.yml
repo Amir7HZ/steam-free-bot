@@ -1,0 +1,57 @@
+name: Steam Free Games Bot
+
+on:
+  schedule:
+    # هر ۶ ساعت اجرا شود (ساعت ۰، ۶، ۱۲، ۱۸ UTC)
+    - cron: '0 */6 * * *'
+    
+  # امکان اجرای دستی
+  workflow_dispatch:
+    inputs:
+      manual_run:
+        description: 'اجرای دستی ربات'
+        required: false
+        default: 'آره'
+
+# تنظیمات محیط
+env:
+  TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+  CHAT_ID: ${{ secrets.CHAT_ID }}
+
+jobs:
+  check-and-send:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # قدم ۱: دانلود کد
+    - name: 📥 دانلود کدهای ریپو
+      uses: actions/checkout@v3
+      
+    # قدم ۲: نصب پایتون
+    - name: 🐍 نصب پایتون ۳.۱۰
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    # قدم ۳: نصب کتابخانه‌ها
+    - name: 📦 نصب کتابخانه‌های مورد نیاز
+      run: |
+        pip install requests beautifulsoup4 lxml
+        
+    # قدم ۴: نمایش اطلاعات
+    - name: ℹ️ نمایش اطلاعات
+      run: |
+        echo "📅 تاریخ: $(date)"
+        echo "🤖 ربات استیم در حال اجرا..."
+        echo "👤 آیدی: $CHAT_ID"
+        
+    # قدم ۵: اجرای ربات
+    - name: 🚀 اجرای ربات اصلی
+      run: python steam_bot.py
+      
+    # قدم ۶: لاگ موفقیت
+    - name: ✅ لاگ موفقیت
+      if: success()
+      run: |
+        echo "🎉 ربات با موفقیت اجرا شد!"
+        echo "⏰ زمان بعدی اجرا: ۶ ساعت دیگر"

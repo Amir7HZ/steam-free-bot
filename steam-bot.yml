@@ -23,6 +23,6 @@ jobs:
       
     - name: Run Steam Bot
       env:
-        TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-        CHAT_ID: ${{ secrets.CHAT_ID }}
+        TELEGRAM_TOKEN: ${{ vars.TELEGRAM_TOKEN }}
+        CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
       run: python steam_bot.py

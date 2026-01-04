@@ -1,3 +1,8 @@
+- name: 📦 نصب کتابخانه‌های مورد نیاز
+  run: |
+    pip install requests beautifulsoup4 lxml
+    echo "✅ کتابخانه‌های وب‌اسکرپینگ نصب شدند"
+
 name: Steam 100% OFF Games Bot
 
 on:
